@@ -1,9 +1,11 @@
 
 import { defineStore }  from "pinia"
-import { computed, ref, watch } from "vue"
+import { computed, ref, watch, watchEffect } from "vue"
+import { useCouponStore } from "./coupons"
 
 export const useCartStore = defineStore('cart',()=>{
 
+    const coupon = useCouponStore()
     const items = ref([])
     const subtotal = ref(0)
     const taxtes = ref(0)
@@ -12,13 +14,10 @@ export const useCartStore = defineStore('cart',()=>{
     const MAX_PRODUCTS = 5
     const TAX_RATE = .16
 
-    watch(items, () =>{
+    watchEffect(() =>{
         subtotal.value = items.value.reduce((total, item) => total + (item.quantity * item.price), 0)
         taxtes.value = subtotal.value * TAX_RATE
-        total.value = subtotal.value + taxtes.value
-
-    },{
-        deep: true
+        total.value = (subtotal.value + taxtes.value) - coupon.discount
     })
 
     function addItem(item) {
