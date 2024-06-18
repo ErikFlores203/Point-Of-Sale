@@ -2,10 +2,16 @@
 import { defineStore }  from "pinia"
 import { computed, ref, watch, watchEffect } from "vue"
 import { useCouponStore } from "./coupons"
+import { collection, addDoc } from "firebase/firestore"
+import { useFirestore } from "vuefire"
+import { getCurrentDate } from "@/helpers"
+
+
 
 export const useCartStore = defineStore('cart',()=>{
 
     const coupon = useCouponStore()
+    const db = useFirestore()
     const items = ref([])
     const subtotal = ref(0)
     const taxtes = ref(0)
@@ -16,8 +22,8 @@ export const useCartStore = defineStore('cart',()=>{
 
     watchEffect(() =>{
         subtotal.value = items.value.reduce((total, item) => total + (item.quantity * item.price), 0)
-        taxtes.value = subtotal.value * TAX_RATE
-        total.value = (subtotal.value + taxtes.value) - coupon.discount
+        taxtes.value = Number((subtotal.value * TAX_RATE).toFixed(2))
+        total.value = Number(((subtotal.value + taxtes.value) - coupon.discount).toFixed(2))
     })
 
     function addItem(item) {
@@ -42,6 +48,34 @@ export const useCartStore = defineStore('cart',()=>{
         items.value = items.value.filter(item => item.id !== id)
     }
 
+    async function checkout(){
+        try {
+            await addDoc(collection(db, 'sales'),{
+                items: items.value.map(item => {
+                    const {availability, category, ...data} = item
+                    return data
+                }),
+                subtotal: subtotal.value,
+                taxtes: taxtes.value,
+                discount: coupon.discount,
+                total: total.value,
+                date: getCurrentDate()
+            })
+
+            $reset()
+            coupon.$reset()
+
+        } catch (error) {
+            console.log(error);
+        }
+    }
+    function $reset(){
+        items.value = []
+        subtotal.value = 0
+        taxtes.value = 0
+        total.value = 0
+    }
+
     const isItemInCart = id => items.value.findIndex(item => item.id === id)
 
     const isProductAvailable = (item, index) =>{
@@ -58,6 +92,7 @@ export const useCartStore = defineStore('cart',()=>{
         addItem,
         updateQuantity,
         removeItem,
+        checkout,
         isEmpty,
         items,
         subtotal,
